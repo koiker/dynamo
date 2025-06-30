@@ -55,7 +55,23 @@ class ResourceAllocator:
         """Initialize the resource allocator."""
         self.system_resources = system_resources()
         self.gpu_manager = GPUManager()
-        self.remaining_gpus = len(self.system_resources[NVIDIA_GPU])
+        self.gpu_indices: list[int] | None = None
+
+        cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+        if cuda_visible_devices:
+            try:
+                self.gpu_indices = [
+                    int(i) for i in cuda_visible_devices.split(",") if i
+                ]
+                self.remaining_gpus = len(self.gpu_indices)
+            except ValueError:
+                logger.warning(
+                    f"Invalid value for CUDA_VISIBLE_DEVICES: {cuda_visible_devices}. "
+                    "Falling back to all available GPUs."
+                )
+                self.remaining_gpus = len(self.system_resources[NVIDIA_GPU])
+        else:
+            self.remaining_gpus = len(self.system_resources[NVIDIA_GPU])
 
         # For compatibility with the old implementation
         self._available_gpus: list[tuple[float, float]] = [
@@ -85,7 +101,7 @@ class ResourceAllocator:
             )
         self.remaining_gpus = int(max(0, self.remaining_gpus - count))
 
-        assigned = []  # Will store assigned GPU indices
+        assigned_relative = []  # Will store assigned GPU indices
 
         if count < 1:  # a fractional GPU
             try:
@@ -109,7 +125,7 @@ class ResourceAllocator:
                 self._available_gpus[gpu] = (0.0, count)
             else:
                 self._available_gpus[gpu] = (remaining, count)
-            assigned = [gpu]
+            assigned_relative = [gpu]
         else:  # allocate n GPUs, n is a positive integer
             if int(count) != count:
                 raise ResourceError("Float GPUs larger than 1 is not supported")
@@ -126,7 +142,13 @@ class ResourceAllocator:
                     self._available_gpus.append((1.0, 1.0))
             for gpu in unassigned[:count]:
                 self._available_gpus[gpu] = (0.0, 1.0)
-            assigned = unassigned[:count]
+            assigned_relative = unassigned[:count]
+
+        # Map to actual GPU indices if CUDA_VISIBLE_DEVICES is set
+        if self.gpu_indices:
+            assigned = [self.gpu_indices[i] for i in assigned_relative]
+        else:
+            assigned = assigned_relative
 
         # Store the allocation if service_name is provided
         if service_name and assigned:
@@ -180,11 +202,10 @@ class ResourceAllocator:
             logger.info(f"GPU requirement found: {num_gpus}")
 
             # Check if we have enough GPUs
-            available_gpus = self.gpu_manager.get_available_gpus()
-            if num_gpus > len(available_gpus):
-                logger.warning(
-                    f"Requested {num_gpus} GPUs, but only {len(available_gpus)} are available. "
-                    f"Service may fail due to inadequate GPU resources."
+            if num_gpus > self.remaining_gpus:
+                raise ResourceError(
+                    f"Not enough GPUs to run this service. "
+                    f"Required: {num_gpus}, Available: {self.remaining_gpus}"
                 )
 
         # Determine number of workers

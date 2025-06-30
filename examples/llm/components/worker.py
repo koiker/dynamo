@@ -89,6 +89,9 @@ class VllmWorker:
 
         self.metrics_publisher = WorkerMetricsPublisher()
 
+        # Parsing envvars from shell to the worker
+        os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+
         signal.signal(signal.SIGTERM, self.shutdown_vllm_engine)
         signal.signal(signal.SIGINT, self.shutdown_vllm_engine)
 

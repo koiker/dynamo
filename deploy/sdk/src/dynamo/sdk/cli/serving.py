@@ -65,7 +65,7 @@ def _get_dynamo_worker_script(
 
 def create_dynamo_watcher(
     dynamo_identifier: str,
-    svc: ServiceProtocol,
+    svc: Any,
     uds_path: str,
     scheduler: ResourceAllocator,
     working_dir: Optional[str] = None,
@@ -112,6 +112,8 @@ def create_dynamo_watcher(
         working_dir=working_dir,
         env=worker_env,
     )
+    if resource_envs:
+        watcher.env.update(resource_envs[0])
 
     logger.info(f"Created watcher for {svc.name}'s in the {namespace} namespace")
 
@@ -171,7 +173,7 @@ def serve_dynamo_graph(
 
     namespace: str = ""
     env: dict[str, Any] = {}
-    svc = find_and_load_service(graph, working_dir)
+    svc: Any = find_and_load_service(graph, working_dir)
     dynamo_path = pathlib.Path(working_dir or ".")
 
     watchers: list[Watcher] = []

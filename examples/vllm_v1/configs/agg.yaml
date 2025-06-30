@@ -13,13 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 Common:
-  model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-  served_model_name: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  # model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  # served_model_name: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  model: meta-llama/Llama-3.3-70B-Instruct
+  served_model_name: meta-llama/Llama-3.3-70B-Instruct
 
 Frontend:
   endpoint: dynamo.SimpleLoadBalancer.generate_agg
-  port: 8000
-  served_model_name: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  port: 8001
+  # served_model_name: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  served_model_name: meta-llama/Llama-3.3-70B-Instruct
 
 SimpleLoadBalancer:
   enable_disagg: false
@@ -30,5 +33,5 @@ VllmDecodeWorker:
   ServiceArgs:
     workers: 1
     resources:
-      gpu: '1'
+      gpu: '2'
   common-configs: [model, served_model_name]

@@ -23,16 +23,6 @@ from typing import Optional
 
 from utils.args import parse_vllm_args
 from utils.protocol import MyRequestOutput, vLLMGenerateRequest
-from vllm.entrypoints.openai.api_server import (
-    build_async_engine_client_from_engine_args,
-)
-
-# Additional vLLM imports for DP worker
-from vllm.usage.usage_lib import UsageContext
-from vllm.utils import get_tcp_uri
-from vllm.v1.engine.core import EngineCoreProc
-from vllm.v1.engine.core_client import CoreEngineProcManager
-from vllm.v1.executor.abstract import Executor
 
 from dynamo.sdk import async_on_start, dynamo_context, endpoint, service
 
@@ -43,13 +33,17 @@ class VllmBaseWorker:
     def __init__(self):
         class_name = self.__class__.__name__
         self.engine_args = parse_vllm_args(class_name, "")
-
+        
         signal.signal(signal.SIGTERM, self.graceful_shutdown)
         signal.signal(signal.SIGINT, self.graceful_shutdown)
 
         self.set_side_channel_host_and_port()
 
     async def async_init(self):
+        from vllm.entrypoints.openai.api_server import (
+            build_async_engine_client_from_engine_args,
+        )
+
         self._engine_context = build_async_engine_client_from_engine_args(
             self.engine_args
         )
@@ -164,6 +158,13 @@ class VllmDecodeWorker(VllmBaseWorker):
 class VllmDpWorker(VllmBaseWorker):
     @async_on_start
     async def async_init(self):
+        logger.info(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'Not Set')}")
+        from vllm.usage.usage_lib import UsageContext
+        from vllm.utils import get_tcp_uri
+        from vllm.v1.engine.core import EngineCoreProc
+        from vllm.v1.engine.core_client import CoreEngineProcManager
+        from vllm.v1.executor.abstract import Executor
+
         vllm_config = self.engine_args.create_engine_config(
             usage_context=UsageContext.OPENAI_API_SERVER
         )
